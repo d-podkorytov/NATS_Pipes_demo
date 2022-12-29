@@ -1,6 +1,8 @@
 # NATS Pipe examples kit
 
-It is a small suite of examples for stream computation with NATS in unix pipes or even as a basement for HADOOP like computation in the NATS ecosystem 
+It is a small suite of examples for stream computation with NATS in unix pipes or even as a basement for HADOOP's like computation in the NATS ecosystem 
+
+
 
 ## Get dependencies
 go get github.com/nats-io/nats.go
@@ -14,6 +16,8 @@ go build NATS_Pipe_Stream.go
 
 And use like:
 NATS_Pipe_Stream from_subject to_subject
+
+from_subject === handler ====> to_subject
 
 It listen from_subject, print (or transform) input message and pass it to to_subject stream  
 
