@@ -17,7 +17,8 @@ go build NATS_Pipe_Stream.go
 And use like:
 NATS_Pipe_Stream from_subject to_subject
 
-from_subject === handler ====> to_subject
+Dataflow:
+NATS from_subject ===> handler ====> to_subject of NATS
 
 It listen from_subject, print (or transform) input message and pass it to to_subject stream  
 
