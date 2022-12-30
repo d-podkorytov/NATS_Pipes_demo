@@ -1,7 +1,8 @@
 // Run function call(string)-> string for of GoMacro script for every incoming message from n data sources
 // log errors to logging_subject
 // pass metrics to metrics_subject
-// TODO: read from file
+// TODO: read code from file
+//       read coed from nc.Subscribe
 
 package main
 
@@ -14,6 +15,7 @@ import (
         "encoding/binary"
 	"encoding/json"
 //        "reflect"
+        "bufio"
 
         "github.com/cosmos72/gomacro/fast"
 	"github.com/nats-io/nats.go"
@@ -38,6 +40,8 @@ var (
 
         NATSConnection       *nats.Conn
         Metrics              serviceMetrics
+        Call_Code            = expvar.NewString("\nfunc call(inp siting) string {\nreturn inp}\n")
+        Code_Subject         = expvar.NewString("code_subj")   
 )
 
 type serviceMetrics struct {
@@ -109,7 +113,21 @@ func main() {
 
     Metrics_Subj=os.Args[len(os.Args)-1]
     ticker := time.NewTicker(1000 * time.Millisecond)
+    Code_Subject.Set("code_subject")
 
+// get Call_Code from file or Subscribe next
+
+// File_Name:="f"
+// code_bytes,err_code:= ReadFile(File_Name)
+/*
+  code_bytes,err_code:= ReadSubject(nc,Code_Subject)
+
+ if err_code != nil { log.Printf("err_code %v %v",File_Name,err_code)
+                      os.Exit(1)
+                    }
+
+ if err_code == nil {Call_Code.Set(string(code_bytes))}
+*/
     go func() {
         for {
             select {
@@ -152,10 +170,21 @@ func pipe(first string, next string, tolog string) {
                          nc.Publish(tolog,[]byte(fmt.Sprintf("err_connect for %v %v",first,err_nc)))
                          os.Exit(1) 
                         }
+
 	defer nc.Drain()
         NATSConnection=nc
 
-	// start pipe service
+// Read code from Subscription
+  code_bytes,err_code:= ReadSubject(nc,Code_Subject.Value())
+
+ if err_code != nil { log.Printf("err_code %v %v",Code_Subject,err_code)
+                      os.Exit(1)}
+
+ if err_code == nil {Call_Code.Set(string(code_bytes))}
+
+//  code_bytes,err_code:= ReadSubject(nc,Code_Subject)
+
+// start pipe service
  try_subscribing:=3
 
  subsribing:
@@ -171,7 +200,7 @@ func pipe(first string, next string, tolog string) {
                                    //os.Exit(1) 
                                   }
 	         fmt.Println(string(rep.Data))
-                 msg.Respond([]byte(string(f("code here",nc,tolog,rep.Data))))
+                 msg.Respond([]byte(string(f(Call_Code.Value(),nc,tolog,rep.Data))))
                 
 	})
 
@@ -198,11 +227,13 @@ func pipe(first string, next string, tolog string) {
 
 // pipe function
 
-func f(code string,nc *nats.Conn,logsubj string,inp []byte) []byte {
+func f(call_code string,nc *nats.Conn,logsubj string,inp []byte) []byte {
 
  Input_Bytes.Add(int64(len(inp)))
  Speed_Input_Bytes.Add(int64(len(inp)))
- out:=[]byte(RunGomacro("func call(inp string) string {\nretrun inp}\n",string(inp)))
+// out:=[]byte(RunGomacro(call_code+"\n func call(inp string) string {\nreturn inp}\n",string(inp)))
+// call_code like " func call(inp string) string {\nreturn inp}\n"
+ out:=[]byte(RunGomacro(call_code,string(inp)))
 
  // echo out to log
  nc.Publish(logsubj,out)
@@ -220,10 +251,40 @@ func f(code string,nc *nats.Conn,logsubj string,inp []byte) []byte {
 func RunGomacro(call string,toeval string) string {
     interp  := fast.New()
     // define fun call(string) string in file
-    vals, err_vals := interp.Eval(call+"\n"+"call("+toeval+")")
+    vals, err_vals := interp.Eval(call+"\n"+"call("+toeval+")\n")
     // for simplicity, only use the first returned value
     if err_vals==nil {return fmt.Sprintf("%v",vals[0].ReflectValue())}
 
     Errors.Add(1)
     return fmt.Sprintf("error %v %v",toeval, err_vals)
+}
+
+func ReadFile(filename string) ([]byte, error) {
+    file, err := os.Open(filename)
+
+    if err != nil { return nil, err}
+    defer file.Close()
+
+    stats, statsErr := file.Stat()
+    if statsErr != nil { return nil, statsErr}
+
+    var size int64 = stats.Size()
+    bytes := make([]byte, size)
+
+    bufr := bufio.NewReader(file)
+    _,err = bufr.Read(bytes)
+
+    return bytes, err
+}
+
+
+func ReadSubject(nc *nats.Conn,code_subject string) ([]byte, error) {
+
+ 	sub, sub_err := nc.SubscribeSync(code_subject) //+".*")
+
+        if sub_err!=nil {return []byte(fmt.Sprintf("error subsribing %v %#v",code_subject,sub)), sub_err }
+
+	msg, msg_err := sub.NextMsg(10 * time.Millisecond)
+
+        return msg.Data, msg_err
 }
