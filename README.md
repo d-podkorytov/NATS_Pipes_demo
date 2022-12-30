@@ -56,5 +56,7 @@ Using:
 ## Dataflow:  
 ##  from_subject1 ===> Handler ====> to_subject of NATS
 ##  from_subject2 ===> ....... ====> logger_subject 
-##  from_subject3 ===> _______ ====> metrics_subject
+##  from_subject3 ===> ....... ====> metrics_subject
+##   ...
+##  from_subjectN ===> ....... 
                 
