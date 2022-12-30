@@ -2,8 +2,8 @@
 // log errors to logging_subject
 // pass metrics to metrics_subject
 // DEBUG: read code from file
-//        read code from nc.SubscribeSync
-// TODO:  read code updates from nc.Subscribe Async
+//        read code from NATSConnection.SubscribeSync
+// TODO:  read code updates from NATSConnection.Subscribe Async
 //        refactor  pipe function for moving nc connection outside 
 //        clean code, move to shared state logger and metrics subjects
 
@@ -38,16 +38,16 @@ var (
 	Speed_Output_Bytes   = expvar.NewInt("Speed_Output_Bytes")
 	Speed_Errors         = expvar.NewInt("Speed_Errors")
 
-        // for sharing , logging and management 
+        // for sharing , logging and management , now thouse can be changed on fly
         Metrics_Subj         = expvar.NewString("metrics")
         Logger_Subj          = expvar.NewString("logger")
         Code_Subject         = expvar.NewString("code_subj")   
 
-        NATSConnection       *nats.Conn
+        NATSConnection       *nats.Conn        // globally shared  
         Metrics              serviceMetrics
 
         Call_Code            = expvar.NewString("\nfunc call(inp string) string {\nreturn inp}\n")
-  // for Reduce it'll be "\nfunc call(inp string) string {\nreturn Shared_Result=Shared_Result+inp}\n" and publish Shared_Result to given next_subj inside ticker timer
+  // for Reduce it'll be "\nfunc call(inp string) string {\nreturn Shared_Result.Set(Shared_Result.Value()+inp)}\n" and publish Shared_Result to given next_subj inside ticker timer
 
         Shared_Result        = expvar.NewString("") // Shared State for Fold and Reduce
 
@@ -175,17 +175,17 @@ func main() {
 
  if len(os.Args) > 4 {
    for i:=3;i<len(os.Args)-3;i++ { fmt.Printf(" go pipe %v -> %v log=%v met=%v\n",os.Args[i],os.Args[len(os.Args)-3],os.Args[len(os.Args)-2],Metrics_Subj )
-                                   go pipe(nc,os.Args[i],os.Args[len(os.Args)-3],os.Args[len(os.Args)-2])
+                                   go pipe(os.Args[i],os.Args[len(os.Args)-3],os.Args[len(os.Args)-2])
                                  }
    } 
    // last pipe is in waiting state
    fmt.Printf(" pipe %v -> %v log=%v met=%v\n",os.Args[1],os.Args[len(os.Args)-3],os.Args[len(os.Args)-2],Metrics_Subj)
    // pipe (from, to, log)
-   pipe(nc,os.Args[1],os.Args[len(os.Args)-3],os.Args[len(os.Args)-2])
+   pipe(os.Args[1],os.Args[len(os.Args)-3],os.Args[len(os.Args)-2])
 
 }
 
-func pipe(nc *nats.Conn,first string, next string, tolog string) {
+func pipe(first string, next string, tolog string) {
         Counter_Calls.Add(1) 
   Speed_Counter_Calls.Add(1)
 /*
@@ -197,16 +197,16 @@ func pipe(nc *nats.Conn,first string, next string, tolog string) {
                          Errors.Add(1) 
                    Speed_Errors.Add(1)
 
-                         nc.Publish(Logger_Subj.Value(),[]byte(fmt.Sprintf("err_connect for %v %v",first,err_nc)))
+                         NATSConnection.Publish(Logger_Subj.Value(),[]byte(fmt.Sprintf("err_connect for %v %v",first,err_nc)))
                          os.Exit(1) 
                         }
 
-	defer nc.Drain()
+	defer NATSConnection.Drain()
 
         NATSConnection=nc
 */
 // Read code from Subscription
-  code_bytes,err_code:= ReadSubject(nc,Code_Subject.Value())
+  code_bytes,err_code:= ReadSubject(Code_Subject.Value())
 
  if err_code != nil { log.Printf("err_code %v %v",Code_Subject,err_code)
                       os.Exit(1)}
@@ -220,25 +220,25 @@ func pipe(nc *nats.Conn,first string, next string, tolog string) {
 
  subsribing:
         {try_subscribing--
-	sub, err_sub := nc.Subscribe(first, func(msg *nats.Msg) {
+	sub, err_sub := NATSConnection.Subscribe(first, func(msg *nats.Msg) {
                  		 //name := msg.Subject[6:]
-                 //rep, _ := nc.Request("next.joe", []byte(name), time.Second)
-                 rep, err_req := nc.Request(next, []byte(msg.Subject), time.Second)
+                 //rep, _ := NATSConnection.Request("next.joe", []byte(name), time.Second)
+                 rep, err_req := NATSConnection.Request(next, []byte(msg.Subject), time.Second)
                  if err_req !=nil {log.Printf("%v",err_req)
                                    Errors.Add(1) 
                              Speed_Errors.Add(1)
-                                   nc.Publish(Logger_Subj.Value(),[]byte(fmt.Sprintf("error_request for %v %v",next,err_req)))
+                                   NATSConnection.Publish(Logger_Subj.Value(),[]byte(fmt.Sprintf("error_request for %v %v",next,err_req)))
                                    //os.Exit(1) 
                                   }
 	         fmt.Println(string(rep.Data))
-                 msg.Respond([]byte(string(f(Call_Code.Value(),nc,Logger_Subj.Value(),rep.Data))))
+                 msg.Respond([]byte(string(f(Call_Code.Value(),Logger_Subj.Value(),rep.Data))))
                 
 	})
 
        if err_sub !=nil {log.Printf("%v",err_sub)
                          Errors.Add(1)
                    Speed_Errors.Add(1)
-                         nc.Publish(Logger_Subj.Value(),[]byte(fmt.Sprintf("error_subscribe for %v %v",first,err_sub)))             
+                         NATSConnection.Publish(Logger_Subj.Value(),[]byte(fmt.Sprintf("error_subscribe for %v %v",first,err_sub)))             
                          //os.Exit(1) 
                         }
        log.Println("sub=",sub," first=",first," next=",next," log=",Logger_Subj.Value()," metrics=",Metrics_Subj )  
@@ -247,27 +247,27 @@ func pipe(nc *nats.Conn,first string, next string, tolog string) {
        if try_subscribing > 0 {goto subsribing}
   
 	// ask service
-	//rep, _ := nc.Request("first.joe", nil, time.Second)
+	//rep, _ := NATSConnection.Request("first.joe", nil, time.Second)
 	//fmt.Println(string(rep.Data))
 	// stop servicing
 	//sub.Unsubscribe()
 	//
-	//_, err := nc.Request("first.joe", nil, time.Second)
+	//_, err := NATSConnection.Request("first.joe", nil, time.Second)
 	//fmt.Println(err)
 }
 
 // pipe function
 
-func f(call_code string,nc *nats.Conn,logsubj string,inp []byte) []byte {
+func f(call_code string,logsubj string,inp []byte) []byte {
 
  Input_Bytes.Add(int64(len(inp)))
  Speed_Input_Bytes.Add(int64(len(inp)))
 // out:=[]byte(RunGomacro(call_code+"\n func call(inp string) string {\nreturn inp}\n",string(inp)))
 // call_code like " func call(inp string) string {\nreturn inp}\n"
- out:=[]byte(RunGomacro(nc,call_code,string(inp)))
+ out:=[]byte(RunGomacro(call_code,string(inp)))
 
  // echo out to log
- nc.Publish(logsubj,out)
+ NATSConnection.Publish(logsubj,out)
  // watch out lost presion binary.Size() is returning int
  log.Printf("%v\n",string(out)) 
  //
@@ -279,7 +279,7 @@ func f(call_code string,nc *nats.Conn,logsubj string,inp []byte) []byte {
 }
 
 //func RunGomacro(toeval string) reflect.Value {
-func RunGomacro(nc *nats.Conn,call string,toeval string) string {
+func RunGomacro(call string,toeval string) string {
     interp  := fast.New()
     // define fun call(string) string in file
     vals, err_vals := interp.Eval(call+"\n"+"call("+toeval+")\n")
@@ -309,9 +309,9 @@ func ReadFile(filename string) ([]byte, error) {
 }
 
 
-func ReadSubject(nc *nats.Conn,code_subject string) ([]byte, error) {
+func ReadSubject(code_subject string) ([]byte, error) {
 
- 	sub, sub_err := nc.SubscribeSync(code_subject) //+".*")
+ 	sub, sub_err := NATSConnection.SubscribeSync(code_subject) //+".*")
 
         if sub_err!=nil {return []byte(fmt.Sprintf("error subsribing %v %#v",code_subject,sub)), sub_err }
 
@@ -320,7 +320,7 @@ func ReadSubject(nc *nats.Conn,code_subject string) ([]byte, error) {
         return msg.Data, msg_err
 }
 
-func ReadSubjectAsync(nc *nats.Conn,code_subject string) bool {
+func ReadSubjectAsync(code_subject string) bool {
 
         if NATSConnection == nil { log.Printf(" NATSConnection == nil at code subsription ")
                                    return false 
