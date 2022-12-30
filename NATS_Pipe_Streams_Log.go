@@ -12,14 +12,15 @@ import (
 
 func main() {
 
-      if len(os.Args) < 4 {fmt.Printf("Run this NATS pipe like \n%v input_subj output_subj log_subj\n",os.Args[0])
+      if len(os.Args) < 4 {fmt.Printf("Run this NATS pipe like \n%v input_subj1 ... input_subj_n  output_subj log_subj \n",os.Args[0])
                            os.Exit(1)
                           }
 
+ if len(os.Args) > 3 {
    for i:=2;i<len(os.Args)-2;i++ { fmt.Printf(" go pipe %v -> %v %v \n",os.Args[i],os.Args[len(os.Args)-2],os.Args[len(os.Args)-1])
                                    go pipe(os.Args[i],os.Args[len(os.Args)-2],os.Args[len(os.Args)-1])
                                  }
-    
+   } 
    // last pipe is in waiting state
    fmt.Printf(" pipe %v -> %v %v \n",os.Args[1],os.Args[len(os.Args)-2],os.Args[len(os.Args)-1])
    // pipe (from to log)
@@ -34,17 +35,23 @@ func pipe(first string, next string, tolog string) {
 
 	nc, err_nc := nats.Connect(url)
         if err_nc !=nil {log.Printf("%v",err_nc)
+                         nc.Publish(tolog,[]byte(fmt.Sprintf("err_connect for %v %v",first,err_nc)))
                          os.Exit(1) 
                         }
 	defer nc.Drain()
 
 	// start pipe service
+ try_subscribing:=3
+
+ subsribing:
+        {try_subscribing--
 	sub, err_sub := nc.Subscribe(first, func(msg *nats.Msg) {
                  		 //name := msg.Subject[6:]
                  //rep, _ := nc.Request("next.joe", []byte(name), time.Second)
                  rep, err_req := nc.Request(next, []byte(msg.Subject), time.Second)
                  if err_req !=nil {log.Printf("%v",err_req)
-                                   os.Exit(1) 
+                                   nc.Publish(tolog,[]byte(fmt.Sprintf("error_request for %v %v",next,err_req)))
+                                   //os.Exit(1) 
                                   }
 	         fmt.Println(string(rep.Data))
                  msg.Respond([]byte(string(f(nc,tolog,rep.Data))))
@@ -52,11 +59,14 @@ func pipe(first string, next string, tolog string) {
 	})
 
        if err_sub !=nil {log.Printf("%v",err_sub)
-                                      os.Exit(1) 
-                                     }
-
+                         nc.Publish(tolog,[]byte(fmt.Sprintf("error_subscribe for %v %v",first,err_sub)))             
+                         //os.Exit(1) 
+                        }
        log.Println("sub=",sub," first=",first," next=",next," log=",tolog)  
 
+       }
+       if try_subscribing > 0 {goto subsribing}
+  
 	// ask service
 	//rep, _ := nc.Request("first.joe", nil, time.Second)
 	//fmt.Println(string(rep.Data))
