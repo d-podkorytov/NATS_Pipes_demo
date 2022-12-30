@@ -216,7 +216,10 @@ func f(nc *nats.Conn,logsubj string,inp []byte) []byte {
 //func RunGomacro(toeval string) reflect.Value {
 func RunGomacro(toeval string) string {
     interp  := fast.New()
-    vals, _ := interp.Eval(toeval)
+    vals, err_vals := interp.Eval(toeval)
     // for simplicity, only use the first returned value
-    return fmt.Sprintf("%v",vals[0].ReflectValue())
+    if err_vals==nil {return fmt.Sprintf("%v",vals[0].ReflectValue())}
+
+    Errors.Add(1)
+    return fmt.Sprintf("error %v %v",toeval, err_vals)
 }
