@@ -53,8 +53,8 @@ go build NATS_Pipe_Streams_Log_Metrics.go
 Using:
  NATS_Pipe_Streams_Log_Metrics from_subj1 ... from_subj4  to_subject log_subject metrics_subject
  
- Dataflow: NATS from_subject1 ===> Handler ====> to_subject of NATS
-                from_subject2 ===>         ====> logger_subject 
-                from_subject3 ===>         ====> metrics_subject
-                ....
-                from_subjectn ===>
+ Dataflow:  
+ from_subject1 ===> Handler ====> to_subject of NATS
+ from_subject2 ===> ....... ====> logger_subject 
+ from_subject3 ===> _______ ====> metrics_subject
+                
