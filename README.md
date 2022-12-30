@@ -61,4 +61,9 @@ Using:
 ##  ...
 ##  from_subjectN ===> | __________|====> metrics_subject
 
+## RPC
+
+See file NATS_Pipe_RPC.go
+It read code from N input NATS subjects, execute it and publish it output_subject
+
                 
