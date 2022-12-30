@@ -55,8 +55,8 @@ Using:
  
 ## Dataflow for this pipe:  
 ##  from_subject1 ===> | Handler    |====> to_subject of NATS
-##  from_subject2 ===> | __________ |====> logger_subject
+##  from_subject2 ===> | __________|====> logger_subject
 ##  ...
-##  from_subjectN ===> | __________ |====> metrics_subject
+##  from_subjectN ===> | __________|====> metrics_subject
 
                 
