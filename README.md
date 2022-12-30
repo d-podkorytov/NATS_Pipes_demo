@@ -1,7 +1,7 @@
 # NATS Pipe examples kit
 
-It is a small suite of examples for stream computation with NATS in unix pipes or even as a basement for HADOOP's like computation in the NATS ecosystem 
-
+It is a small suite of examples for stream computation with NATS in unix pipes or even as a basement for HADOOP's like computation in the NATS ecosystem. 
+Joined logging for errors to some NATS subject and publishing metrics to separated NATS service 
 
 
 ## Get dependencies
