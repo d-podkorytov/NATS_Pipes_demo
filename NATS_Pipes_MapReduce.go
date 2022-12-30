@@ -1,4 +1,3 @@
-// Depricated , see NATS_Pipes_MapReduce.do instead
 // Run function call(string)-> string for of GoMacro script for every incoming message from n data sources
 // log errors to logging_subject
 // pass metrics to metrics_subject
@@ -47,7 +46,9 @@ var (
         NATSConnection       *nats.Conn
         Metrics              serviceMetrics
 
-        Call_Code            = expvar.NewString("\nfunc call(inp siting) string {\nreturn inp}\n")
+        Call_Code            = expvar.NewString("\nfunc call(inp string) string {\nreturn inp}\n")
+  // for Reduce it'll be "\nfunc call(inp string) string {\nreturn Shared_Result=Shared_Result+inp}\n" and publish Shared_Result to given next_subj inside ticker timer
+
         Shared_Result        = expvar.NewString("") // Shared State for Fold and Reduce
 
 )
