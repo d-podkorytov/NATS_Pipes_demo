@@ -41,3 +41,14 @@ go build NATS_Pipe_Streams_Log.go
 
 Using:
  NATS_Pipe_Streams_Log from_subj1 ... from_subj4  to_subject log_subject
+
+
+## Multiple streams echoing with metrics collection and publishing in some NATS end point
+
+It like abowe but gather input data from many NATS sourcies
+
+Build it:
+go build NATS_Pipe_Streams_Log_Metrics.go
+
+Using:
+ NATS_Pipe_Streams_Log_Metrics from_subj1 ... from_subj4  to_subject log_subject metrics_subject
